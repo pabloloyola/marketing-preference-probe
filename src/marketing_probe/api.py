@@ -67,12 +67,21 @@ def predict(model_key, headline_a, headline_b):
             raise APIError(f"Unexpected decision response shape: {str(raw)[:500]}")
         p = float(probs["A"])
     else:
-        payload = {"model": model, "temperature": 0, "max_tokens": 120,
+        payload = {"model": model, "temperature": 0, "max_tokens": 1024,
                    "messages": [
                       {"role": "system", "content": instruction + " Respond with ONLY a JSON object with a single field p_A between 0 and 1, indicating your subjective probability that A has higher CTR. This is not a predicted human click share."},
                       {"role": "user", "content": json.dumps(state, ensure_ascii=False)}]}
         raw, seconds = request("/v1/chat/completions", payload)
         content = raw.get("choices", [{}])[0].get("message", {}).get("content", "")
+        if not isinstance(content, str) or not content.strip():
+            finish_reason = raw.get("choices", [{}])[0].get("finish_reason")
+            completion_tokens = (raw.get("usage") or {}).get("completion_tokens")
+            raise APIError(
+                f"Generative model returned no text (finish_reason={finish_reason!r}, "
+                f"completion_tokens={completion_tokens!r}). "
+                "This can happen when reasoning consumes the output budget. "
+                "Increase max_tokens or investigate the provider response."
+            )
         try:
             cleaned = content.strip().removeprefix("```json").removeprefix("```").removesuffix("```").strip()
             p = float(json.loads(cleaned)["p_A"])

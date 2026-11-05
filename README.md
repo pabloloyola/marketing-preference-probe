@@ -73,3 +73,7 @@ Matias, J. N., Munger, K., Le Quere, M. A., & Ebersole, C. (2021). *The Upworthy
 - `tests/`: local sanity tests
 
 OpenRouter docs: https://openrouter.ai/api/alpha/decisions and https://openrouter.ai/docs
+
+## Troubleshooting: generative Luna returns no content
+
+Some reasoning calls can finish without visible text if the output budget is exhausted. The generative adapter now uses `max_tokens=1024` (reasoning + final text), checks for empty/null content, and reports an actionable `APIError` instead of crashing with an `AttributeError`. This can increase cost for difficult prompts. The runner does not silently retry paid requests. To resume an interrupted run, simply rerun the same command: successfully recorded (pair, model, repetition) calls are skipped.
