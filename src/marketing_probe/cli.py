@@ -7,6 +7,7 @@ from pathlib import Path
 from .api import MODELS, APIError, predict
 from .dataset import prepare, load_pairs
 from .report import write_report
+from .experiment2 import prepare2, run2, analyze2
 
 
 def append_jsonl(path, obj):
@@ -37,6 +38,29 @@ def make_parser():
     v.add_argument('--pairs', default='data/pairs.jsonl')
     v.add_argument('--predictions', default='runs/predictions.jsonl')
     v.add_argument('--out', default='runs/analysis_v2')
+    e=sub.add_parser('prepare2', help='Disjoint train/cal/test A/B splits')
+    e.add_argument('--csv', required=True)
+    e.add_argument('--exclude', default='data/pairs.jsonl')
+    e.add_argument('--out', default='data/experiment2')
+    e.add_argument('--train', type=int, default=80)
+    e.add_argument('--cal', type=int, default=40)
+    e.add_argument('--test', type=int, default=80)
+    e.add_argument('--seed', type=int, default=2027)
+    e=sub.add_parser('run2', help='Zero-shot vs behavior-grounded models; dry-run default')
+    e.add_argument('--data', default='data/experiment2')
+    e.add_argument('--out', default='runs/experiment2_predictions.jsonl')
+    e.add_argument('--models', nargs='+', choices=MODELS, default=list(MODELS))
+    e.add_argument('--conditions', nargs='+', choices=['zero','fewshot'], default=['zero','fewshot'])
+    e.add_argument('--stages', nargs='+', choices=['cal','test'], default=['cal','test'])
+    e.add_argument('--examples', type=int, default=5)
+    e.add_argument('--limit', type=int, default=0)
+    e.add_argument('--budget', type=float, default=.50)
+    e.add_argument('--max-calls', type=int, default=600)
+    e.add_argument('--live', action='store_true')
+    e=sub.add_parser('analyze2', help='Compare grounded, ungrounded and calibrated results offline')
+    e.add_argument('--data', default='data/experiment2')
+    e.add_argument('--predictions', default='runs/experiment2_predictions.jsonl')
+    e.add_argument('--out', default='runs/experiment2_report.json')
     return p
 
 
@@ -91,6 +115,13 @@ def main():
     elif args.cmd=='report':
         write_report(args.pairs, args.predictions, args.out)
         print(f'Offline report written to {args.out}/report.md (no API calls)')
+    elif args.cmd=='prepare2':
+        print(json.dumps(prepare2(args.csv,args.exclude,args.out,args.train,args.cal,args.test,args.seed),indent=2))
+    elif args.cmd=='run2':
+        run2(args.data,args.out,args.models,args.conditions,args.stages,args.examples,args.limit,args.live,args.budget,args.max_calls)
+    elif args.cmd=='analyze2':
+        result=analyze2(args.data,args.predictions,args.out)
+        print(json.dumps(result,indent=2))
     elif args.cmd=="run":
         if args.limit<1 or args.reps<1 or args.max_calls<1 or args.budget<=0 or args.reserve_per_call<=0:
             raise SystemExit("Invalid run limits")

@@ -92,3 +92,28 @@ Produces `report.md`, `summary.json`, `accuracy.svg`, `brier.svg`,
 No API key, network access, or paid calls needed. Paired bootstrap intervals compare
 models on shared pair IDs. Confidence bins describe **winner correctness**, not human
 click-share calibration. Near-tied CTR results are noisy; this report is exploratory.
+
+## Experiment 2: Grounding predictions in observed A/B outcomes
+
+Uses separate original-archive experiments for training examples (80), probability calibration (40), and an untouched test (80). **The original 100-pair exploratory test IDs are excluded.** The test labels never enter model prompts.
+
+```bash
+git pull origin main
+uv run marketing-probe prepare2 --csv data/upworthy-archive-exploratory-packages-03.12.2020.csv
+uv run marketing-probe run2 --limit 2                   # dry-run, $0
+uv run marketing-probe run2 --limit 2 --budget .10 --max-calls 24 --live
+uv run marketing-probe analyze2
+```
+
+After the smoke test, finish all comparisons (`80 cal + 80 test` per model/condition, 960 requests maximum):
+
+```bash
+uv run marketing-probe run2 --budget 1.00 --max-calls 960 --live
+uv run marketing-probe analyze2
+```
+
+The runner resumes from completed records. The `--max-calls` and `--budget` controls apply to that output file including earlier successful requests; this is a **best-effort guardrail**, not a provider-enforced hard spending limit. Run the complete test only when the dry-run and the initial paid calls work.
+
+**Conditions:** zero-shot and a fixed 5-example prompt containing real human A/B winners from train. **Calibration:** fit a shrinkage coefficient on model probabilities from `cal` only, and apply it to `test`. **Statistical reference:** regularized logistic regression using simple headline features and only `train`.
+
+Review `runs/experiment2_report.json`. Do not compare partial test coverage as if it were a complete benchmark. This evaluates headline A/B winner forecasts—not individual consumer choice or click shares. Public archive contamination remains possible.

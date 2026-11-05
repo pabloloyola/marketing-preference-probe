@@ -42,7 +42,7 @@ def request(endpoint, payload, timeout=45):
     return data, time.perf_counter() - t
 
 
-def predict(model_key, headline_a, headline_b):
+def predict(model_key, headline_a, headline_b, examples=None):
     """Return probability of selecting A as the better *predicted CTR* headline.
 
     IMPORTANT: model probabilities are NOT claimed to be human click probabilities.
@@ -55,6 +55,10 @@ def predict(model_key, headline_a, headline_b):
         "Choose the winner based only on headline wording; do not invent experiment data."
     )
     state = {"context": "Historical US viral-news homepage A/B test", "headline_A": headline_a, "headline_B": headline_b}
+    if examples:
+        instruction += (" Historical randomized A/B outcomes follow as examples. "
+                        "Use their patterns cautiously; they do not determine the new test outcome.")
+        state["historical_examples"] = examples
     if family == "decisions":
         payload = {"model": model, "state": state, "questions": {"winner": {
             "type": "choice", "instructions": instruction,
