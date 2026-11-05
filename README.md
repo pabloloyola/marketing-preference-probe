@@ -77,3 +77,18 @@ OpenRouter docs: https://openrouter.ai/api/alpha/decisions and https://openroute
 ## Troubleshooting: generative Luna returns no content
 
 Some reasoning calls can finish without visible text if the output budget is exhausted. The generative adapter now uses `max_tokens=1024` (reasoning + final text), checks for empty/null content, and reports an actionable `APIError` instead of crashing with an `AttributeError`. This can increase cost for difficult prompts. The runner does not silently retry paid requests. To resume an interrupted run, simply rerun the same command: successfully recorded (pair, model, repetition) calls are skipped.
+
+## Analysis v2: offline diagnostic report
+
+After the 100-pair run finishes:
+
+```bash
+uv run marketing-probe report
+open runs/analysis_v2/report.md
+```
+
+Produces `report.md`, `summary.json`, `accuracy.svg`, `brier.svg`,
+`confidence_bins.csv`, `ctr_margin_bins.csv`, and `confident_errors.json`.
+No API key, network access, or paid calls needed. Paired bootstrap intervals compare
+models on shared pair IDs. Confidence bins describe **winner correctness**, not human
+click-share calibration. Near-tied CTR results are noisy; this report is exploratory.

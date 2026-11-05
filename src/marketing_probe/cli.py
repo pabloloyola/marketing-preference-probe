@@ -6,6 +6,7 @@ import statistics
 from pathlib import Path
 from .api import MODELS, APIError, predict
 from .dataset import prepare, load_pairs
+from .report import write_report
 
 
 def append_jsonl(path, obj):
@@ -32,6 +33,10 @@ def make_parser():
     r.add_argument("--max-calls", type=int, default=300)
     r.add_argument("--live", action="store_true", help="Required to send paid requests")
     a=sub.add_parser("analyze"); a.add_argument("--pairs", default="data/pairs.jsonl"); a.add_argument("--predictions", default="runs/predictions.jsonl")
+    v=sub.add_parser('report', help='Offline analysis v2: plots, baselines and bootstrap intervals')
+    v.add_argument('--pairs', default='data/pairs.jsonl')
+    v.add_argument('--predictions', default='runs/predictions.jsonl')
+    v.add_argument('--out', default='runs/analysis_v2')
     return p
 
 
@@ -83,6 +88,9 @@ def main():
                 print(f"ERROR {m}: {e}")
     elif args.cmd=="analyze":
         analyze(args)
+    elif args.cmd=='report':
+        write_report(args.pairs, args.predictions, args.out)
+        print(f'Offline report written to {args.out}/report.md (no API calls)')
     elif args.cmd=="run":
         if args.limit<1 or args.reps<1 or args.max_calls<1 or args.budget<=0 or args.reserve_per_call<=0:
             raise SystemExit("Invalid run limits")
