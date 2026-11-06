@@ -1,6 +1,7 @@
 import os
 import tempfile
 import unittest
+import importlib.util
 from pathlib import Path
 from marketing_probe.learned_data import save_jsonl,prepare_split,load_split, infer
 from marketing_probe.learned_benchmark import fit_linear,fit_mlp,predict_mlp,sigmoid,learning_curve
@@ -12,6 +13,7 @@ def row(i):
         "winner":"A" if i%2 else "B","clicks_A":150 if i%2 else 90,
         "clicks_B":90 if i%2 else 150,
         "impressions_A":2000,"impressions_B":2000}
+@unittest.skipUnless(importlib.util.find_spec('numpy'), 'numpy learning extra unavailable')
 class BenchmarkTests(unittest.TestCase):
     def test_odd_mlp_and_linear(self):
         import numpy as np
