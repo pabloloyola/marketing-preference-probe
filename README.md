@@ -215,3 +215,54 @@ subjective retrieval quality alone.
 No live requests without \`--live\`. The budget guards are best-effort and
 cannot enforce a strict provider billing ceiling. Do not use test results to
 pick the best method and present them as unbiased confirmatory evidence.
+
+
+## Final offline diagnostic: untouched Upworthy experiments
+
+After inspecting Experiments 1–3, treat all earlier test sets as exploratory.
+This diagnostic sets aside a NEW held-out set that excludes:
+- the original 100 exploratory pair test IDs,
+- all 80/40/80 Experiment 2 test IDs,
+- all 2,000 retrieval-pool test IDs,
+- duplicate exact pairs regardless of A/B order.
+
+It trains a **regularized logistic regression** on signed A–B headline-style
+features from the same 2,000-example retrieval pool used by the hybrid
+retrieval-only predictor. Logistic regression has **no intercept** so
+reversing the choices reverses the probability. Neither model requires
+OpenRouter inference. Both use a fresh calibration set for optional
+shrinkage, and a further untouched test set for evaluation.
+
+\`\`\`bash
+git pull origin main
+uv run python -m unittest discover -s tests -v
+
+# Fresh 100 calibration + 300 test comparisons. Does not change earlier files.
+uv run marketing-probe prepare-final \
+  --csv data/upworthy-archive-exploratory-packages-03.12.2020.csv \
+  --cal 100 --test 300
+
+# Uses locally cached/downloaded Qwen3 embeddings, no OpenRouter API calls.
+uv run --extra retrieval marketing-probe analyze-final
+
+cat runs/final_diagnostic/report.md
+\`\`\`
+
+Outputs:
+- \`data/final_holdout/cal.jsonl\`, \`test.jsonl\`, \`manifest.json\` (never committed)
+- \`runs/final_diagnostic/report.md\`
+- \`runs/final_diagnostic/summary.json\`
+
+The manifest records hashes; analysis refuses changed test/cal files or
+overlap with prior experimental cases. Diagnostic comparisons include a
+constant 50/50 model, logistic regression, and hybrid retrieval-only model,
+each with raw and calibration-shrunk probabilities, paired bootstrap
+accuracy/Brier intervals, and accuracy broken down by observed CTR
+difference-to-standard-error ratio (<1, 1–2, >=2).
+
+**The reliability bands are descriptive:** they use observed CTR differences
+to group tests, not model inputs, and the z-score is an approximate measure
+that may be noisy. The statistical model uses handcrafted textual features;
+this is not a learned customer representation. This is a *one-time* final
+diagnostic: choosing the best method from its test scores and further tuning
+on this same set would invalidate confirmatory claims.

@@ -10,6 +10,7 @@ from .report import write_report
 from .experiment2 import prepare2, run2, analyze2
 from .experiment3 import run3, analyze3, preview3
 from .retrieval_v2 import make_pool, preview as preview_v2, run as run_v2, analyze as analyze_v2, METHODS
+from .final_diagnostic import prepare_final, report_final
 
 
 def append_jsonl(path, obj):
@@ -115,6 +116,23 @@ def make_parser():
     e.add_argument('--predictions',default=None)
     e.add_argument('--previous',default='runs/experiment2_predictions.jsonl')
     e.add_argument('--out',default=None)
+    e=sub.add_parser('prepare-final',help='Prepare fresh disjoint held-out diagnostics')
+    e.add_argument('--csv',required=True)
+    e.add_argument('--pool',default='data/retrieval_v2/pool.jsonl')
+    e.add_argument('--data',default='data/experiment2')
+    e.add_argument('--exploratory',default='data/pairs.jsonl')
+    e.add_argument('--out',default='data/final_holdout')
+    e.add_argument('--cal',type=int,default=100)
+    e.add_argument('--test',type=int,default=300)
+    e.add_argument('--seed',type=int,default=5091)
+    e=sub.add_parser('analyze-final',help='Fully offline retrieval vs choice logit on fresh tests')
+    e.add_argument('--pool',default='data/retrieval_v2/pool.jsonl')
+    e.add_argument('--holdout',default='data/final_holdout')
+    e.add_argument('--data',default='data/experiment2')
+    e.add_argument('--exploratory',default='data/pairs.jsonl')
+    e.add_argument('--cache',default='data/final_holdout/embeddings.npz')
+    e.add_argument('--out',default='runs/final_diagnostic')
+    e.add_argument('--k',type=int,default=5)
     return p
 
 
@@ -190,6 +208,12 @@ def main():
         run_v2(args.pool,args.data,args.method,args.k,args.limit,args.models,args.out,args.cache,args.budget,args.max_calls,args.live)
     elif args.cmd=='analyze-retrieval':
         print(json.dumps(analyze_v2(args.pool,args.data,args.method,args.k,args.predictions,args.previous,args.out,args.cache),indent=2))
+    elif args.cmd=='prepare-final':
+        print(json.dumps(prepare_final(args.csv,args.pool,args.data,args.exploratory,args.out,args.cal,args.test,args.seed),indent=2))
+    elif args.cmd=='analyze-final':
+        results=report_final(args.pool,args.holdout,args.data,args.exploratory,args.cache,args.out,args.k)
+        print('Created '+args.out+'/report.md and summary.json (no paid API calls)')
+        print(json.dumps(results['metrics'],indent=2))
     elif args.cmd=="run":
         if args.limit<1 or args.reps<1 or args.max_calls<1 or args.budget<=0 or args.reserve_per_call<=0:
             raise SystemExit("Invalid run limits")
