@@ -67,18 +67,27 @@ def synthetic_control(n=900, draws=500, seed=2027, prior=.5,
     clicks are binomial draws. Posterior coverage uses independent Beta priors.
     This tests observation-model behavior, NOT forecasting by the actual LLMs.
     """
-    if n<20 or draws<100 or prior<=0 or not impressions or not effects:
+    if (n<20 or draws<100 or prior<=0 or not impressions or not effects
+            or any(not isinstance(v,int) or v<1 for v in impressions)
+            or any(not math.isfinite(e) or e<0 for e in effects)
+            or max(effects)>=.14):
         raise ValueError("Invalid simulation settings")
     rng=random.Random(seed)
     cells=defaultdict(list)
     for k in range(n):
         sample_n=impressions[k%len(impressions)]
         effect=effects[(k//len(impressions))%len(effects)]
-        q_b=rng.uniform(.015,.14)
+        # Sample the same baseline CTR support for both effect directions.
+        # The lower bound is large enough for *every* negative effect,
+        # avoiding impossible negative CTRs without clipping effect size.
+        # This intentionally changes the original baseline range when
+        # the largest tested effect is greater than 0.015.
+        baseline_min=max(.015, max(effects)+.001)
+        q_b=rng.uniform(baseline_min,.14)
         delta=effect*(1 if rng.random()<.5 else -1)
         q_a=q_b+delta
-        if not 0<q_a<1:
-            raise ValueError("Synthetic CTR out of range")
+        if not (0<q_a<1 and 0<q_b<1):
+            raise AssertionError("Synthetic sampling invariant violated")
         # Built-in binomial simulation, no external dependency.
         ca=sum(rng.random()<q_a for _ in range(sample_n))
         cb=sum(rng.random()<q_b for _ in range(sample_n))
@@ -112,7 +121,7 @@ def synthetic_control(n=900, draws=500, seed=2027, prior=.5,
     return {"description":"Synthetic beta-binomial posterior recovery; simulated CTRs are known",
             "n":n,"draws_per_posterior":draws,"seed":seed,
             "prior_shape":prior,"impression_sizes":list(impressions),
-            "absolute_effect_sizes":list(effects),"cells":output,
+            "absolute_effect_sizes":list(effects),"baseline_ctr_range":[max(.015,max(effects)+.001),.14],"cells":output,
             "limitation":"Equal underlying CTRs (delta=0) have no strict A-winner; observed-win agreement uses strict comparison and is not a classifier accuracy claim."}
 
 def analyze(directory="data/experiment2",

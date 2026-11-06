@@ -323,3 +323,5 @@ Use --synthetic-n, --synthetic-draws, --draws, and --prior for controlled sensit
 For Experiment 2 predictions only:
 
     uv run marketing-probe calibration2 --predictions runs/experiment2_predictions.jsonl
+
+Calibration 2 synthetic sampling correction: baseline CTR is drawn from [max(0.015, max absolute effect + 0.001), 0.14] for **both** effect directions, ensuring the simulated treatment CTR remains in (0,1) without clipping the imposed effect size. Runs with effects >=0.14 are rejected. The shared baseline range differs from the original [0.015, 0.14] when the maximum effect is large.

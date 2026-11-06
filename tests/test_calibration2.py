@@ -28,6 +28,17 @@ class CalibrationTwoTests(unittest.TestCase):
         self.assertEqual(len(result["cells"]),4)
         for cell in result["cells"].values():
             self.assertTrue(0<=cell["ctr_difference_95ci_coverage"]<=1)
+    def test_largest_negative_effect_stays_valid(self):
+        # Regression: a 4 pp negative effect cannot be applied to a 1.5% baseline.
+        for seed in (1, 3, 2027, 999):
+            result=synthetic_control(n=40,draws=100,seed=seed,
+                                     impressions=(30,),effects=(.04,))
+            self.assertEqual(result["n"],40)
+            self.assertGreater(result["baseline_ctr_range"][0],.04)
+            self.assertEqual(len(result["cells"]),1)
+        with self.assertRaises(ValueError):
+            synthetic_control(n=40,draws=100,effects=(.15,))
+
     def test_offline_end_to_end(self):
         with tempfile.TemporaryDirectory() as td:
             d=Path(td)
