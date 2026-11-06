@@ -16,13 +16,23 @@ class RetrievalV2Tests(unittest.TestCase):
     def test_differences_and_reversed_alignment(self):
         history=[pair(1,"How to save money?","A great day", "A"),
                  pair(2,"Boring report","An amazing discovery!", "B")]
-        target=pair(99,"A great day","How to save money?", "B")
+        target=pair(99,"A wonderfully great day","How to save more money?", "B")
         retr=RetrievalV2(history,method="structure")
         examples=retr.find(target,k=2)
         self.assertEqual(len(examples),2)
         self.assertTrue(all("observed_higher_ctr" in e for e in examples))
-        self.assertEqual(signature(target),signature(history[0]))
+        self.assertNotEqual(signature(target),signature(history[0]))
         self.assertEqual(examples[0]["observed_higher_ctr"],"B")
+
+    def test_identical_pair_is_excluded_even_when_reversed(self):
+        history=[pair(1,"How to save money?","A great day", "A"),
+                 pair(2,"Boring report","An amazing discovery!", "B")]
+        target=pair(99,"A great day","How to save money?", "B")
+        retr=RetrievalV2(history,method="structure")
+        result=retr.find(target,k=1)
+        self.assertEqual(result[0]["source_pair_id"],"2")
+        with self.assertRaisesRegex(ValueError,"Insufficient candidates"):
+            retr.find(target,k=2)
 
     def test_no_overlapping_pool(self):
         with tempfile.TemporaryDirectory() as td:
