@@ -13,6 +13,7 @@ from .retrieval_v2 import make_pool, preview as preview_v2, run as run_v2, analy
 from .final_diagnostic import prepare_final, report_final
 from .calibration1 import analyze as analyze_calibration1
 from .calibration2 import analyze as analyze_calibration2
+from .calibration3 import analyze as analyze_calibration3
 
 
 def append_jsonl(path, obj):
@@ -157,6 +158,15 @@ def make_parser():
     e.add_argument('--synthetic-n',type=int,default=900)
     e.add_argument('--synthetic-draws',type=int,default=500)
     e.add_argument('--seed',type=int,default=2027)
+    e=sub.add_parser('calibration3',help='Offline AUC and calibration mappings on saved predictions')
+    e.add_argument('--data',default='data/experiment2')
+    e.add_argument('--predictions',nargs='+',default=[
+        'runs/experiment2_predictions.jsonl',
+        'runs/retrieval_v2_semantic.jsonl',
+        'runs/retrieval_v2_hybrid.jsonl'])
+    e.add_argument('--out',default='runs/calibration_3')
+    e.add_argument('--bootstrap-draws',type=int,default=1500)
+    e.add_argument('--seed',type=int,default=2027)
     return p
 
 
@@ -255,6 +265,11 @@ def main():
         print(json.dumps({'observed_tests':result['observed_tests'],
                           'systems':{k:v['coverage'] for k,v in result['models'].items()},
                           'synthetic_cells':len(result['synthetic_control']['cells'])},indent=2))
+    elif args.cmd=='calibration3':
+        result=analyze_calibration3(args.data,args.predictions,args.out,args.bootstrap_draws,args.seed)
+        print('Created '+args.out+'/report.md and summary.json (offline; zero API calls)')
+        print(json.dumps({'cal_size':result['cal_size'],'test_size':result['test_size'],
+                          'systems':{name:item['status'] for name,item in result['systems'].items()}},indent=2))
     elif args.cmd=="run":
         if args.limit<1 or args.reps<1 or args.max_calls<1 or args.budget<=0 or args.reserve_per_call<=0:
             raise SystemExit("Invalid run limits")

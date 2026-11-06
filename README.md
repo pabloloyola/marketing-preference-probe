@@ -325,3 +325,24 @@ For Experiment 2 predictions only:
     uv run marketing-probe calibration2 --predictions runs/experiment2_predictions.jsonl
 
 Calibration 2 synthetic sampling correction: baseline CTR is drawn from [max(0.015, max absolute effect + 0.001), 0.14] for **both** effect directions, ensuring the simulated treatment CTR remains in (0,1) without clipping the imposed effect size. Runs with effects >=0.14 are rejected. The shared baseline range differs from the original [0.015, 0.14] when the maximum effect is large.
+
+## Calibration Experiment 3 — AUC vs calibrated probabilities
+
+**No API calls**: uses saved Experiment 2 and retrieval predictions. The existing 40-case calibration split fits the mappings; the 80-case test set evaluates them. That test set has already been inspected, so findings are **retrospective/exploratory**, not an independent confirmation.
+
+Run:
+
+    git pull origin main
+    uv run python -m unittest discover -s tests -v
+    uv run marketing-probe calibration3
+    cat runs/calibration_3/report.md
+
+Or, if retrieval prediction files are missing:
+
+    uv run marketing-probe calibration3 --predictions runs/experiment2_predictions.jsonl
+
+Compared mappings: raw probabilities, previously used one-parameter shrinkage, regularized A/B-symmetric temperature scaling (zero intercept, nonnegative slope), and regularized monotone Platt scaling (intercept plus nonnegative slope). Also constant 0.5 and smoothed calibration-only winner prevalence. All calibrator parameters and prevalence are fitted on the 40 calibration cases, **never** on the 80 tests. Incomplete model coverage is explicitly skipped, rather than compared at different sample counts.
+
+Outputs: runs/calibration_3/report.md and summary.json. Metrics include Mann-Whitney AUC (ties earn half credit; undefined for one-class labels), Brier, log loss, confidence, equal-count reliability bins, and paired bootstrap Brier differences vs calibration-prevalence. Exact 0.5 forecasts abstain for classification accuracy. AUC generally stays unchanged under positive monotone maps; calibration cannot manufacture ranking information.
+
+**Research caveat:** Platt intercept may break A/B order symmetry. A small 40-case calibration sample makes all fitted transforms noisy. The result cannot establish trustworthy behavior probabilities without prospective data.
