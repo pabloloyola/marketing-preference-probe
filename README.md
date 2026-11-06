@@ -277,3 +277,28 @@ and 120 test cases**. The candidate enumeration uses all eligible tests,
 then excludes every protected experiment ID and duplicate pair before
 splitting. If fewer than 160 survive, the command reports the actual
 number remaining rather than silently changing the inclusion requirements.
+
+## Calibration Experiment 1 — observation uncertainty versus model confidence
+
+This is a retrospective OFFLINE diagnostic using Experiment 2's 40 calibration and 80 test cases, their click counts, and saved model predictions. No OpenRouter requests or Qwen model inference are necessary.
+
+Commands:
+
+    git pull origin main
+    uv run python -m unittest discover -s tests -v
+    uv run marketing-probe calibration1
+    cat runs/calibration_1/report.md
+
+Outputs under runs/calibration_1/: report.md, summary.json (per-model diagnostics and reliability bins), and observation_uncertainty.csv (posterior probabilities and credible intervals).
+
+The observation model uses independent Beta(a,a) CTR priors with a=0.5 and a=2.0, 4,000 posterior draws, and a normal approximation to the repeat-test winner probability for 1,000 *future* impressions per arm. It reports both latent CTR superiority and repeat-test outcome probabilities; these are different events.
+
+**Caution:** Posterior results are conditioned on the historical clicks and are not independent ground truth or valid future-outcome labels. Previously inspected cases remain exploratory. The current confidence transformation is restricted shrinkage toward 0.5, not a full calibration fit. Brier scores and reliability bins use the recorded *hard winner* labels.
+
+For Experiment 2 predictions only, if local retrieval prediction files are absent:
+
+    uv run marketing-probe calibration1 --predictions runs/experiment2_predictions.jsonl
+
+To increase simulation draws:
+
+    uv run marketing-probe calibration1 --draws 8000 --repeat-n 2000
