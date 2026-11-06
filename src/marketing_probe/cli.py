@@ -14,6 +14,8 @@ from .final_diagnostic import prepare_final, report_final
 from .calibration1 import analyze as analyze_calibration1
 from .calibration2 import analyze as analyze_calibration2
 from .calibration3 import analyze as analyze_calibration3
+from .learned_data import prepare_split as prepare_learned_split, infer as infer_learned
+from .learned_benchmark import learning_curve as run_learned_benchmark, SIZES
 
 
 def append_jsonl(path, obj):
@@ -167,6 +169,30 @@ def make_parser():
     e.add_argument('--out',default='runs/calibration_3')
     e.add_argument('--bootstrap-draws',type=int,default=1500)
     e.add_argument('--seed',type=int,default=2027)
+    e=sub.add_parser('prepare-learned',help='Frozen 1400/300/300 developmental split of existing 2k pool')
+    e.add_argument('--pool',default='data/retrieval_v2/pool.jsonl')
+    e.add_argument('--out',default='data/learned_correction')
+    e.add_argument('--train',type=int,default=1400)
+    e.add_argument('--val',type=int,default=300)
+    e.add_argument('--test',type=int,default=300)
+    e.add_argument('--seed',type=int,default=26011)
+    e=sub.add_parser('infer-learned',help='Zero-shot model scores for learnable heads; DRY RUN unless --live')
+    e.add_argument('--data',default='data/learned_correction')
+    e.add_argument('--out',default='runs/learned_correction/predictions.jsonl')
+    e.add_argument('--models',nargs='+',choices=MODELS,default=list(MODELS))
+    e.add_argument('--stages',nargs='+',choices=['train','val','test'],default=['train','val','test'])
+    e.add_argument('--limit',type=int,default=0,help='Max NEW calls this invocation, 0 means all pending')
+    e.add_argument('--budget',type=float,default=.25,help='Cumulative USD budget guard over output file')
+    e.add_argument('--max-calls',type=int,default=100,help='Cumulative call guard over output file')
+    e.add_argument('--reserve-per-call',type=float,default=.005)
+    e.add_argument('--live',action='store_true')
+    e=sub.add_parser('benchmark-learned',help='Offline AEM-style correction learning curves; requires all model scores')
+    e.add_argument('--data',default='data/learned_correction')
+    e.add_argument('--predictions',default='runs/learned_correction/predictions.jsonl')
+    e.add_argument('--out',default='runs/learned_correction/benchmark')
+    e.add_argument('--models',nargs='+',choices=MODELS,default=list(MODELS))
+    e.add_argument('--sizes',nargs='+',type=int,default=list(SIZES))
+    e.add_argument('--seed',type=int,default=26011)
     return p
 
 
@@ -270,6 +296,16 @@ def main():
         print('Created '+args.out+'/report.md and summary.json (offline; zero API calls)')
         print(json.dumps({'cal_size':result['cal_size'],'test_size':result['test_size'],
                           'systems':{name:item['status'] for name,item in result['systems'].items()}},indent=2))
+    elif args.cmd=='prepare-learned':
+        print(json.dumps(prepare_learned_split(args.pool,args.out,args.train,args.val,args.test,args.seed),indent=2))
+    elif args.cmd=='infer-learned':
+        print(json.dumps(infer_learned(args.data,args.out,args.models,args.stages,
+                args.limit,args.budget,args.max_calls,args.reserve_per_call,args.live),indent=2))
+    elif args.cmd=='benchmark-learned':
+        result=run_learned_benchmark(args.data,args.predictions,args.out,args.models,args.sizes,args.seed)
+        print('Created '+args.out+'/report.md and summary.json (no API calls)')
+        print(json.dumps({'sizes':result['sizes'],'models':result['models'],
+                          'rows':len(result['results'])},indent=2))
     elif args.cmd=="run":
         if args.limit<1 or args.reps<1 or args.max_calls<1 or args.budget<=0 or args.reserve_per_call<=0:
             raise SystemExit("Invalid run limits")

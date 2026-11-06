@@ -346,3 +346,40 @@ Compared mappings: raw probabilities, previously used one-parameter shrinkage, r
 Outputs: runs/calibration_3/report.md and summary.json. Metrics include Mann-Whitney AUC (ties earn half credit; undefined for one-class labels), Brier, log loss, confidence, equal-count reliability bins, and paired bootstrap Brier differences vs calibration-prevalence. Exact 0.5 forecasts abstain for classification accuracy. AUC generally stays unchanged under positive monotone maps; calibration cannot manufacture ranking information.
 
 **Research caveat:** Platt intercept may break A/B order symmetry. A small 40-case calibration sample makes all fitted transforms noisy. The result cannot establish trustworthy behavior probabilities without prospective data.
+
+## Learned behavioral correction (AEM-style) — development benchmark
+
+Goal: test whether model scores add information beyond conventional supervised headline features as the number of available human-labeled A/B tests increases. **Do not confuse this with calibrating an LLM's raw output alone.** A small learnable layer receives both the model score and the features describing the choice alternatives.
+
+### 1. Freeze developmental split
+
+    git pull origin main
+    uv run python -m unittest discover -s tests -v
+    uv run marketing-probe prepare-learned
+
+This partitions the existing 2,000-case historical retrieval pool into 1,400 training, 300 validation, 300 development-test rows. It does not reuse earlier Experiment 2 or final-diagnostic test IDs. It refuses to overwrite a split with changed sizes, seed, or source hash. It creates data/learned_correction/{train,val,test}.jsonl and manifest.json (ignored by Git). **The underlying pool was previously used for exploratory retrieval-method development, so the split is not a pristine external confirmation test.**
+
+### 2. Inspect zero-cost inference plan and run tiny paid smoke
+
+    uv run marketing-probe infer-learned --limit 12
+    uv run marketing-probe infer-learned --limit 12 --max-calls 12 --budget 0.10 --live
+
+Live calls require OPENROUTER_API_KEY. The smoke covers the first 12 pending (pair,model) tasks in train order. They are ZERO-SHOT: historical winning labels and click counts are never sent to the model. Output: runs/learned_correction/predictions.jsonl. Resume skips completed tasks, while budget and max-calls are cumulative over this file. The guard is **best effort**, based on provider-reported costs or a reserve when cost is unknown; it is not a provider-side spending cap. On model/API changes use a separate output and a fresh experiment.
+
+### 3. Extend coverage deliberately
+
+    uv run marketing-probe infer-learned --budget 2.00 --max-calls 6000
+    uv run marketing-probe infer-learned --budget 2.00 --max-calls 6000 --live
+
+The first is a free plan. The second may make up to 6,000 paid calls (minus existing successes) **only if explicitly invoked with --live**; adjust the budget after examining the smoke's actual cost and error rate. For 2,000 pairs and three models, full coverage is 6,000 calls. A 2 USD limit is only an example and can stop early if not sufficient. The script refuses to benchmark any selected model with incomplete train/val/test coverage. For staged collection, use --models jev first, then --models luna_chat or luna_decisions, and raise --max-calls cumulatively.
+
+### 4. Benchmark learned correction offline
+
+    uv run --extra learning marketing-probe benchmark-learned
+    cat runs/learned_correction/benchmark/report.md
+
+The learning curves use nested training sizes 40, 100, 250, 500, 1,000, 1,400. They compare (a) human-only signed headline-feature logistic and a small odd tanh MLP; (b) model-score-only logistic; and (c) headline features + a model's zero-shot score, using the same linear/MLP heads. Human-only and model-augmented models use identical supervised training subsets. The signed feature vector and model score are standardized only from the current training subset. A/B symmetry is imposed in the heads using no intercept or hidden biases, assuming the model score itself is reversal-symmetric (not yet validated).
+
+The primary comparison is model+features minus features-only **at the same training size and head family**, using validation for ridge selection and the development test solely for evaluation. Both Brier and log loss measure confidence, and AUC measures ranking. Raw model-score baselines and 0.5/training-prevalence probability baselines are also reported. The objective is currently the hard empirical higher-CTR winner; count-aware/uncertainty-weighted training is a follow-up and must not be claimed as implemented.
+
+IMPORTANT: Once the development test is inspected, stop tuning to it. External validation with a different dataset or prospective trials is required for a confirmatory claim. Raw model numbers may be answer distributions, not probabilities of real human actions. Even if features+model wins, a label-efficiency effect needs replication and statistical uncertainty analysis.
