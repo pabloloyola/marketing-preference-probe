@@ -141,21 +141,6 @@ def predict_mlp(x,weights):
     w,u,v=weights
     return sigmoid(x@w+np.tanh(x@u)@v)
 
-def fitted_predictions(xtrain,ytrain,xval,xtest,kind,seed=1):
-    """Choose ridge from validation Brier (never test); fixed model family."""
-    choices=[]
-    for ridge in RIDGES:
-        if kind=="linear":
-            model=fit_linear(xtrain,ytrain,l2=ridge)
-            pv=sigmoid(xval@model);pt=sigmoid(xtest@model)
-        elif kind=="mlp":
-            model=fit_mlp(xtrain,ytrain,l2=ridge,seed=seed)
-            pv=predict_mlp(xval,model);pt=predict_mlp(xtest,model)
-        else:raise ValueError("Unknown kind")
-        choices.append((brier(labels_from_array(ytrain,ytrain.shape),pv) if False else None,
-                        ridge,pv,pt))
-    return choices
-
 def choose_head(train,val,test,kind,seed):
     xtr,ytr=train
     xv,yv=val
