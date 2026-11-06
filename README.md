@@ -383,3 +383,25 @@ The learning curves use nested training sizes 40, 100, 250, 500, 1,000, 1,400. T
 The primary comparison is model+features minus features-only **at the same training size and head family**, using validation for ridge selection and the development test solely for evaluation. Both Brier and log loss measure confidence, and AUC measures ranking. Raw model-score baselines and 0.5/training-prevalence probability baselines are also reported. The objective is currently the hard empirical higher-CTR winner; count-aware/uncertainty-weighted training is a follow-up and must not be claimed as implemented.
 
 IMPORTANT: Once the development test is inspected, stop tuning to it. External validation with a different dataset or prospective trials is required for a confirmatory claim. Raw model numbers may be answer distributions, not probabilities of real human actions. Even if features+model wins, a label-efficiency effect needs replication and statistical uncertainty analysis.
+
+## Follow-up: stronger supervised baselines and nonlinear-head audit
+
+After collecting the full 6,000 predictions, no further OpenRouter calls are needed for these diagnostics.
+
+### Audit nonlinear head and training-subset stability
+
+    git pull origin main
+    uv run --extra learning python -m unittest discover -s tests -v
+    uv run --extra learning marketing-probe audit-learned
+    cat runs/learned_correction/audit/report.md
+
+The audit measures MLP nonlinear contribution and runs a true odd-parity synthetic control that cannot be expressed with a linear decision boundary. It reports rather than assumes that the current tanh MLP succeeds; if the MLP fails the control, nonlinear comparison must remain unvalidated. It retrains linear heads on 10 independent 500-case training subsets, computes test-set Brier differences paired on the same 300 cases, and reports paired bootstrap intervals. Shared test cases make the ten training repetitions correlated, not ten independent holdouts. All results remain retrospective.
+
+### Stronger human-only controls: frozen Qwen headline embeddings
+
+    uv run --extra retrieval marketing-probe benchmark-embeddings
+    cat runs/learned_correction/embedding_baseline/report.md
+
+This optionally downloads/loads local Qwen3-Embedding-0.6B via sentence-transformers, embeds 4,000 headlines, and saves a fingerprinted local cache under data/learned_correction. Frozen headline embeddings are differenced in A−B order and projected into 64 dimensions using a seed-fixed, **label-independent** random matrix. Each supervised linear head is fitted only on train and chooses ridge from validation, comparing Qwen alone, handcrafted alone, Qwen+handcrafted, model-only, and Qwen+model at each labeled-data budget. All comparisons share the same fixed 300-case DEVELOPMENT test. Results include Brier, AUC, and paired bootstrap differences against Qwen-only. Reusing the test for interpretation is not new independent confirmation.
+
+Both commands are OFFLINE as to paid APIs. The embedding run may need network access to download Qwen weights. Neither command fits count-aware CTR effects yet. Do not adjust projection seeds/head architectures based on observed test errors and then call the same test confirmatory.

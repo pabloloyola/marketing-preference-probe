@@ -16,6 +16,8 @@ from .calibration2 import analyze as analyze_calibration2
 from .calibration3 import analyze as analyze_calibration3
 from .learned_data import prepare_split as prepare_learned_split, infer as infer_learned
 from .learned_benchmark import learning_curve as run_learned_benchmark, SIZES
+from .learned_audit import audit as audit_learned
+from .learned_embedding import run as run_embedding_baseline
 
 
 def append_jsonl(path, obj):
@@ -193,6 +195,23 @@ def make_parser():
     e.add_argument('--models',nargs='+',choices=MODELS,default=list(MODELS))
     e.add_argument('--sizes',nargs='+',type=int,default=list(SIZES))
     e.add_argument('--seed',type=int,default=26011)
+    e=sub.add_parser('audit-learned',help='Offline paired test intervals, subset stability and nonlinear positive control')
+    e.add_argument('--data',default='data/learned_correction')
+    e.add_argument('--predictions',default='runs/learned_correction/predictions.jsonl')
+    e.add_argument('--out',default='runs/learned_correction/audit')
+    e.add_argument('--size',type=int,default=500)
+    e.add_argument('--repeats',type=int,default=10)
+    e.add_argument('--bootstrap-draws',type=int,default=2000)
+    e.add_argument('--seed',type=int,default=26011)
+    e=sub.add_parser('benchmark-embeddings',help='Frozen Qwen embedding supervised controls (no paid API calls)')
+    e.add_argument('--data',default='data/learned_correction')
+    e.add_argument('--predictions',default='runs/learned_correction/predictions.jsonl')
+    e.add_argument('--out',default='runs/learned_correction/embedding_baseline')
+    e.add_argument('--cache',default='data/learned_correction/qwen_headlines.npz')
+    e.add_argument('--sizes',nargs='+',type=int,default=list(SIZES))
+    e.add_argument('--dimension',type=int,default=64)
+    e.add_argument('--batch',type=int,default=16)
+    e.add_argument('--seed',type=int,default=26011)
     return p
 
 
@@ -306,6 +325,18 @@ def main():
         print('Created '+args.out+'/report.md and summary.json (no API calls)')
         print(json.dumps({'sizes':result['sizes'],'models':result['models'],
                           'rows':len(result['results'])},indent=2))
+    elif args.cmd=='audit-learned':
+        result=audit_learned(args.data,args.predictions,args.out,args.size,
+            args.repeats,args.bootstrap_draws,args.seed)
+        print('Created '+args.out+'/report.md and summary.json (offline)')
+        print(json.dumps({'positive_control':result['positive_control']['results'],
+            'repetitions':len(result['repetitions'])},indent=2))
+    elif args.cmd=='benchmark-embeddings':
+        result=run_embedding_baseline(args.data,args.predictions,args.out,args.cache,
+            args.sizes,args.dimension,args.seed,args.batch)
+        print('Created '+args.out+'/report.md and summary.json (local embeddings; no paid API calls)')
+        print(json.dumps({'rows':len(result['results']),
+            'projection_dimensions':result['projection_dimensions']},indent=2))
     elif args.cmd=="run":
         if args.limit<1 or args.reps<1 or args.max_calls<1 or args.budget<=0 or args.reserve_per_call<=0:
             raise SystemExit("Invalid run limits")
