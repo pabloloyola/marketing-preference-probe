@@ -5,6 +5,9 @@ description = "Compare generative and decision-model predictions against human A
 requires-python = ">=3.11"
 dependencies = []
 
+[project.optional-dependencies]
+retrieval = ["numpy>=1.26", "sentence-transformers>=3.0"]
+
 [project.scripts]
 marketing-probe = "marketing_probe.cli:main"
 

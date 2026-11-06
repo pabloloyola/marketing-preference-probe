@@ -9,6 +9,7 @@ from .dataset import prepare, load_pairs
 from .report import write_report
 from .experiment2 import prepare2, run2, analyze2
 from .experiment3 import run3, analyze3, preview3
+from .retrieval_v2 import make_pool, preview as preview_v2, run as run_v2, analyze as analyze_v2, METHODS
 
 
 def append_jsonl(path, obj):
@@ -80,6 +81,40 @@ def make_parser():
     e.add_argument('--previous', default='runs/experiment2_predictions.jsonl')
     e.add_argument('--out', default='runs/experiment3_report.json')
     e.add_argument('--k', type=int, default=5)
+    e=sub.add_parser('prepare-retrieval',help='Expand corpus without test/calibration leakage')
+    e.add_argument('--csv',required=True)
+    e.add_argument('--data',default='data/experiment2')
+    e.add_argument('--exploratory',default='data/pairs.jsonl')
+    e.add_argument('--pool',default='data/retrieval_v2/pool.jsonl')
+    e.add_argument('--size',type=int,default=2000)
+    e.add_argument('--seed',type=int,default=3026)
+    e=sub.add_parser('preview-retrieval',help='Inspect nearest comparisons; may download local embedding model')
+    e.add_argument('--pool',default='data/retrieval_v2/pool.jsonl')
+    e.add_argument('--data',default='data/experiment2')
+    e.add_argument('--method',choices=METHODS,default='structure')
+    e.add_argument('--cache',default='data/retrieval_v2/embeddings.npz')
+    e.add_argument('--k',type=int,default=5)
+    e=sub.add_parser('run-retrieval',help='Compare retrieval methods on held-out cases; dry-run default')
+    e.add_argument('--pool',default='data/retrieval_v2/pool.jsonl')
+    e.add_argument('--data',default='data/experiment2')
+    e.add_argument('--method',choices=METHODS,default='structure')
+    e.add_argument('--cache',default='data/retrieval_v2/embeddings.npz')
+    e.add_argument('--k',type=int,default=5)
+    e.add_argument('--limit',type=int,default=0)
+    e.add_argument('--models',nargs='+',choices=MODELS,default=list(MODELS))
+    e.add_argument('--out',default=None)
+    e.add_argument('--budget',type=float,default=.50)
+    e.add_argument('--max-calls',type=int,default=360)
+    e.add_argument('--live',action='store_true')
+    e=sub.add_parser('analyze-retrieval',help='Offline report vs Experiment 2')
+    e.add_argument('--pool',default='data/retrieval_v2/pool.jsonl')
+    e.add_argument('--data',default='data/experiment2')
+    e.add_argument('--method',choices=METHODS,default='structure')
+    e.add_argument('--cache',default='data/retrieval_v2/embeddings.npz')
+    e.add_argument('--k',type=int,default=5)
+    e.add_argument('--predictions',default=None)
+    e.add_argument('--previous',default='runs/experiment2_predictions.jsonl')
+    e.add_argument('--out',default=None)
     return p
 
 
@@ -147,6 +182,14 @@ def main():
         run3(args.data,args.out,args.models,args.k,args.limit,args.live,args.budget,args.max_calls)
     elif args.cmd=='analyze3':
         print(json.dumps(analyze3(args.data,args.retrieved,args.previous,args.out,args.k),indent=2))
+    elif args.cmd=='prepare-retrieval':
+        print(json.dumps(make_pool(args.csv,args.data,args.exploratory,args.pool,args.size,args.seed),indent=2))
+    elif args.cmd=='preview-retrieval':
+        print(json.dumps(preview_v2(args.pool,args.data,args.method,args.k,args.cache),indent=2,ensure_ascii=False))
+    elif args.cmd=='run-retrieval':
+        run_v2(args.pool,args.data,args.method,args.k,args.limit,args.models,args.out,args.cache,args.budget,args.max_calls,args.live)
+    elif args.cmd=='analyze-retrieval':
+        print(json.dumps(analyze_v2(args.pool,args.data,args.method,args.k,args.predictions,args.previous,args.out,args.cache),indent=2))
     elif args.cmd=="run":
         if args.limit<1 or args.reps<1 or args.max_calls<1 or args.budget<=0 or args.reserve_per_call<=0:
             raise SystemExit("Invalid run limits")

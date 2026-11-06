@@ -7,3 +7,9 @@ data/*.csv
 data/*.jsonl
 runs/*
 !runs/.gitkeep
+
+# Expanded datasets and locally cached model vectors
+data/**/*.csv
+data/**/*.json
+data/**/*.jsonl
+data/**/*.npz

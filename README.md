@@ -152,3 +152,66 @@ coverage; do not interpret them as full benchmark results.
 genuinely relevant A/B tests. Retried runs skip completed calls. The spending
 guardrails are best-effort, not a provider-enforced hard cap. The evaluation
 is historical headline winner prediction, not customer-level simulation.
+
+
+## Retrieval v2: larger pool, semantic embeddings, choice-structure features
+
+The previous 80-example TF-IDF Experiment 3 is preserved. This upgraded experiment
+builds a separate 2,000-comparison retrieval corpus, excluding the original exploratory
+100 and *all* Experiment 2 train/cal/test **test IDs and exact headline pairs**.
+
+**1. Prepare pool (offline, no OpenRouter calls):**
+\`\`\`bash
+uv run marketing-probe prepare-retrieval --csv data/upworthy-archive-exploratory-packages-03.12.2020.csv --size 2000
+\`\`\`
+
+**2. Inspect lightweight choice-aware and lexical retrieval first:**
+\`\`\`bash
+uv run marketing-probe preview-retrieval --method structure
+uv run marketing-probe preview-retrieval --method tfidf
+\`\`\`
+
+**3. Install local embedding dependencies (larger download, but no API tokens):**
+\`\`\`bash
+uv sync --extra retrieval
+uv run --extra retrieval marketing-probe preview-retrieval --method semantic
+uv run --extra retrieval marketing-probe preview-retrieval --method hybrid
+\`\`\`
+
+Embedding model: \`Qwen/Qwen3-Embedding-0.6B\`, through
+\`sentence-transformers\`. The first execution downloads the model and computes
+embeddings for the historical corpus + held-out queries. It caches normalized
+vectors in \`data/retrieval_v2/embeddings.npz\`; subsequent semantic/hybrid
+previews reuse the cache. This may consume substantial disk/memory and time on a
+Mac; CPU fallback is possible.
+
+**4. Validate dry run, then try a small paid experiment:**
+\`\`\`bash
+uv run marketing-probe run-retrieval --method structure --limit 2
+uv run marketing-probe run-retrieval --method structure --limit 2 --budget .10 --max-calls 12 --live
+uv run marketing-probe analyze-retrieval --method structure
+\`\`\`
+
+When ready to compare Qwen-embedding retrieval:
+\`\`\`bash
+uv run --extra retrieval marketing-probe run-retrieval --method hybrid --limit 2 --budget .10 --max-calls 12 --live
+uv run --extra retrieval marketing-probe analyze-retrieval --method hybrid
+\`\`\`
+
+Full experiments omit \`--limit\` (360 requests/method). Different methods write
+separate JSONL files. The analysis reuses Experiment 2 zero-shot and random
+few-shot predictions and adds a retrieval-only baseline. Calibration is fitted
+solely on the 40 calibration outcomes.
+
+**Method definitions:** \`tfidf\` = A/B-aligned lexical cosine;
+\`structure\` = cosine on measurable differences (headline length, punctuation,
+numbers, simple emotional/curiosity dictionaries, pronouns);
+\`semantic\` = A/B-aligned Qwen embeddings; \`hybrid\` = equal-weight semantic
+and structure similarity. Structure features are rough proxies, **not validated
+psychological or marketing labels**. Greater semantic similarity alone is not
+proof of better behavioral relevance. Compare held-out performance, not
+subjective retrieval quality alone.
+
+No live requests without \`--live\`. The budget guards are best-effort and
+cannot enforce a strict provider billing ceiling. Do not use test results to
+pick the best method and present them as unbiased confirmatory evidence.
