@@ -29,7 +29,7 @@ def protected_paths(pool_path,split_dir,exploratory_path):
 
 def prepare_final(csv_path, pool_path="data/retrieval_v2/pool.jsonl",
                   split_dir="data/experiment2", exploratory_path="data/pairs.jsonl",
-                  output_dir="data/final_holdout", cal_n=100,test_n=300,seed=5091):
+                  output_dir="data/final_holdout", cal_n=40,test_n=120,seed=5091):
     if cal_n<20 or test_n<30:
         raise ValueError("Use at least 20 calibration and 30 test pairs")
     previous=[r for path in protected_paths(pool_path,split_dir,exploratory_path)
@@ -40,7 +40,7 @@ def prepare_final(csv_path, pool_path="data/retrieval_v2/pool.jsonl",
     with tempfile.TemporaryDirectory() as td:
         tmp=Path(td)/"all.jsonl"
         # Existing prepare() picks at most one pair per randomized test.
-        prepare(csv_path,tmp,n=desired+len(exclude_ids)+100,seed=seed)
+        prepare(csv_path,tmp,n=10**9,seed=seed,allow_partial=True)
         pool=read(tmp)
     selected=[]; seen=set(); seen_sigs=set()
     for r in pool:
@@ -51,7 +51,7 @@ def prepare_final(csv_path, pool_path="data/retrieval_v2/pool.jsonl",
         selected.append(r); seen.add(tid);seen_sigs.add(sig)
         if len(selected)==desired:break
     if len(selected)<desired:
-        raise ValueError("Not enough fresh eligible pairs: found %d of %d" % (len(selected),desired))
+        raise ValueError("Only %d fresh distinct tests remain after exclusions; requested %d (cal=%d + test=%d). Reduce --cal/--test, or rebuild a smaller retrieval pool and rerun the earlier benchmarks." % (len(selected),desired,cal_n,test_n))
     root=Path(output_dir)
     write(root/"cal.jsonl",selected[:cal_n])
     write(root/"test.jsonl",selected[cal_n:])

@@ -11,7 +11,7 @@ from collections import defaultdict
 from pathlib import Path
 
 
-def prepare(csv_path, output_path, n=100, seed=42, minimum_impressions=1000):
+def prepare(csv_path, output_path, n=100, seed=42, minimum_impressions=1000, allow_partial=False):
     by_test = defaultdict(list)
     with open(csv_path, newline="", encoding="utf-8-sig") as f:
         for row in csv.DictReader(f):
@@ -60,7 +60,7 @@ def prepare(csv_path, output_path, n=100, seed=42, minimum_impressions=1000):
                        "winner": "A" if a["clicks"]/a["impressions"] > b["clicks"]/b["impressions"] else "B"})
         if len(chosen) >= n:
             break
-    if len(chosen) < n:
+    if len(chosen) < n and not allow_partial:
         raise ValueError(f"Only {len(chosen)} eligible distinct-test headline pairs found; requested {n}. Try a smaller n or lower min impressions.")
     out = Path(output_path)
     out.parent.mkdir(parents=True, exist_ok=True)

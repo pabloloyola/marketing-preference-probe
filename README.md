@@ -237,10 +237,10 @@ shrinkage, and a further untouched test set for evaluation.
 git pull origin main
 uv run python -m unittest discover -s tests -v
 
-# Fresh 100 calibration + 300 test comparisons. Does not change earlier files.
+# Fresh 40 calibration + 120 test comparisons. Does not change earlier files.
 uv run marketing-probe prepare-final \
   --csv data/upworthy-archive-exploratory-packages-03.12.2020.csv \
-  --cal 100 --test 300
+  --cal 40 --test 120
 
 # Uses locally cached/downloaded Qwen3 embeddings, no OpenRouter API calls.
 uv run --extra retrieval marketing-probe analyze-final
@@ -266,3 +266,14 @@ that may be noisy. The statistical model uses handcrafted textual features;
 this is not a learned customer representation. This is a *one-time* final
 diagnostic: choosing the best method from its test scores and further tuning
 on this same set would invalidate confirmatory claims.
+
+**Dataset-size correction (2026-11-06):** With the original selection requirements
+(at least 1,000 impressions per arm, same image/lede, one pair per
+randomized experiment), this archive contains only 2,482 eligible distinct
+tests. The existing 2,000-case retrieval pool and the 300 previously used
+tests leave at most 182 for completely fresh evaluation, so the original
+100+300 holdout request was impossible. Defaults are now **40 calibration
+and 120 test cases**. The candidate enumeration uses all eligible tests,
+then excludes every protected experiment ID and duplicate pair before
+splitting. If fewer than 160 survive, the command reports the actual
+number remaining rather than silently changing the inclusion requirements.
