@@ -117,3 +117,38 @@ The runner resumes from completed records. The `--max-calls` and `--budget` cont
 **Conditions:** zero-shot and a fixed 5-example prompt containing real human A/B winners from train. **Calibration:** fit a shrinkage coefficient on model probabilities from `cal` only, and apply it to `test`. **Statistical reference:** regularized logistic regression using simple headline features and only `train`.
 
 Review `runs/experiment2_report.json`. Do not compare partial test coverage as if it were a complete benchmark. This evaluates headline A/B winner forecasts—not individual consumer choice or click shares. Public archive contamination remains possible.
+
+## Experiment 3 — Retrieval-grounded choice prediction
+
+Uses the **existing Experiment 2 train/cal/test split**. For each new pair, retrieve
+the five most similar A/B tests from the 80 training examples using lexical TF-IDF,
+align alternatives A and B (including reversing the historical winner when needed),
+and include those outcomes in the decision prompt. The target's result is never used
+to retrieve or construct its examples.
+
+```bash
+git pull origin main
+uv run python -m unittest discover -s tests -v
+uv run marketing-probe preview3 --k 5
+uv run marketing-probe run3 --limit 2                         # dry run, no charge
+uv run marketing-probe run3 --limit 2 --budget .10 --max-calls 12 --live
+uv run marketing-probe analyze3
+```
+
+For the full run (40 calibration + 80 test pairs, 3 models; 360 calls):
+
+```bash
+uv run marketing-probe run3 --budget .50 --max-calls 360 --live
+uv run marketing-probe analyze3
+```
+
+The report in `runs/experiment3_report.json` includes **retrieved vs random
+few-shot vs zero-shot** results using the saved Experiment 2 predictions, plus
+a retrieval-only baseline (no model API calls). Calibrated probabilities use
+only the existing separate calibration set. Intermediate/partial reports show
+coverage; do not interpret them as full benchmark results.
+
+**Notes:** TF-IDF is inexpensive, but 80 training examples may not include
+genuinely relevant A/B tests. Retried runs skip completed calls. The spending
+guardrails are best-effort, not a provider-enforced hard cap. The evaluation
+is historical headline winner prediction, not customer-level simulation.

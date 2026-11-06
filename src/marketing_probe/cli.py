@@ -8,6 +8,7 @@ from .api import MODELS, APIError, predict
 from .dataset import prepare, load_pairs
 from .report import write_report
 from .experiment2 import prepare2, run2, analyze2
+from .experiment3 import run3, analyze3, preview3
 
 
 def append_jsonl(path, obj):
@@ -61,6 +62,24 @@ def make_parser():
     e.add_argument('--data', default='data/experiment2')
     e.add_argument('--predictions', default='runs/experiment2_predictions.jsonl')
     e.add_argument('--out', default='runs/experiment2_report.json')
+    e=sub.add_parser('preview3', help='Preview five retrieved examples; offline')
+    e.add_argument('--data', default='data/experiment2')
+    e.add_argument('--k', type=int, default=5)
+    e=sub.add_parser('run3', help='Run retrieval-grounded models; dry-run default')
+    e.add_argument('--data', default='data/experiment2')
+    e.add_argument('--out', default='runs/experiment3_predictions.jsonl')
+    e.add_argument('--models', nargs='+', choices=MODELS, default=list(MODELS))
+    e.add_argument('--k', type=int, default=5)
+    e.add_argument('--limit', type=int, default=0)
+    e.add_argument('--budget', type=float, default=.5)
+    e.add_argument('--max-calls', type=int, default=360)
+    e.add_argument('--live', action='store_true')
+    e=sub.add_parser('analyze3', help='Compare retrieval against Experiment 2')
+    e.add_argument('--data', default='data/experiment2')
+    e.add_argument('--retrieved', default='runs/experiment3_predictions.jsonl')
+    e.add_argument('--previous', default='runs/experiment2_predictions.jsonl')
+    e.add_argument('--out', default='runs/experiment3_report.json')
+    e.add_argument('--k', type=int, default=5)
     return p
 
 
@@ -122,6 +141,12 @@ def main():
     elif args.cmd=='analyze2':
         result=analyze2(args.data,args.predictions,args.out)
         print(json.dumps(result,indent=2))
+    elif args.cmd=='preview3':
+        preview3(args.data,args.k)
+    elif args.cmd=='run3':
+        run3(args.data,args.out,args.models,args.k,args.limit,args.live,args.budget,args.max_calls)
+    elif args.cmd=='analyze3':
+        print(json.dumps(analyze3(args.data,args.retrieved,args.previous,args.out,args.k),indent=2))
     elif args.cmd=="run":
         if args.limit<1 or args.reps<1 or args.max_calls<1 or args.budget<=0 or args.reserve_per_call<=0:
             raise SystemExit("Invalid run limits")
