@@ -302,3 +302,24 @@ For Experiment 2 predictions only, if local retrieval prediction files are absen
 To increase simulation draws:
 
     uv run marketing-probe calibration1 --draws 8000 --repeat-n 2000
+
+## Calibration Experiment 2 — confidence errors and synthetic controls
+
+Compare model mistakes against posterior ambiguity derived from the clicks/impressions, and independently test the observation model on synthetic trials with *known true* CTRs. This is offline and costs no API credits.
+
+    git pull origin main
+    uv run python -m unittest discover -s tests -v
+    uv run marketing-probe calibration2
+    cat runs/calibration_2/report.md
+
+Outputs: runs/calibration_2/report.md, summary.json, error_by_ambiguity.csv, and synthetic_coverage.csv.
+
+Ambiguity measure is 2*min(P(q_A>q_B | observed clicks), P(q_B>q_A | observed clicks)). Groups: low (<0.2), intermediate ([0.2,0.6)), high (>=0.6). Because ambiguity is computed *after observing the outcomes*, subgroup analysis is retrospective, not a prospective performance guarantee. Confidence is max(p_A, 1-p_A). Predictions exactly 0.5 are excluded from correctness summaries (abstentions).
+
+The synthetic control samples a true baseline CTR from [0.015,0.14], varies the signed treatment difference and impression count, generates independent binomial click counts, and uses beta-prior posterior draws to check credible interval coverage of known CTR differences. Agreement with ground truth in this toy simulation only validates the assumptions/code under a simplified DGP, not the model's behavior on real readers.
+
+Use --synthetic-n, --synthetic-draws, --draws, and --prior for controlled sensitivity checks; keep experimental settings fixed when comparing reports. The posterior sample sizes can cause a longer local computation. The existing test cases have already been inspected, so the output must remain exploratory.
+
+For Experiment 2 predictions only:
+
+    uv run marketing-probe calibration2 --predictions runs/experiment2_predictions.jsonl
